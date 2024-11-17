@@ -1,0 +1,70 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import pandas as pd
+import time
+
+# ChromeDriver'ın yolu
+CHROME_DRIVER_PATH = "path_to_chromedriver"
+
+# WebDriver'ı başlatma
+options = webdriver.ChromeOptions()
+options.add_argument("--start-maximized")  # Tarayıcıyı tam ekran açar
+options.add_argument("--headless")  # Tarayıcıyı arka planda çalıştırır (görünmez)
+options.add_argument("--disable-blink-features=AutomationControlled")  # Bot tespiti için
+options.add_argument("--log-level=3")  # Konsol loglarını azaltır
+
+driver = webdriver.Chrome(service=Service(CHROME_DRIVER_PATH), options=options)
+
+# Arama yapmak istediğiniz kategori veya ürün
+SEARCH_TERM = "laptop"
+
+# Trendyol'da ürün arama URL'si
+URL = f"https://www.trendyol.com/sr?q={SEARCH_TERM}"
+
+# Ürün bilgilerini depolamak için liste
+products = []
+
+try:
+    driver.get(URL)
+    wait = WebDriverWait(driver, 10)
+
+    # Sayfayı kaydırarak daha fazla ürün yüklenmesini sağlama
+    for _ in range(5):  # Daha fazla ürün yüklemek için kaydırma sayısını artırabilirsiniz
+        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+        time.sleep(2)
+
+    # Ürün kartlarını bulma
+    product_cards = driver.find_elements(By.CLASS_NAME, "p-card-wrppr")
+
+    for card in product_cards:
+        try:
+            # Ürün adı
+            name = card.find_element(By.CLASS_NAME, "prdct-desc-cntnr-name").text
+
+            # Ürün fiyatı
+            price = card.find_element(By.CLASS_NAME, "prc-box-dscntd").text
+
+            # İndirim oranı (varsa)
+            try:
+                discount = card.find_element(By.CLASS_NAME, "prc-box-orgnl").text
+            except:
+                discount = "Yok"
+
+            # Ürün bilgilerini listeye ekle
+            products.append({"Ürün Adı": name, "Fiyat": price, "İndirim": discount})
+        except Exception as e:
+            print(f"Hata: {e}")
+            continue
+finally:
+    # WebDriver'ı kapatma
+    driver.quit()
+
+# Verileri bir CSV dosyasına kaydetme
+df = pd.DataFrame(products)
+df.to_csv("trendyol_fiyatlar.csv", index=False, encoding="utf-8")
+print("Fiyatlar başarıyla kaydedildi!")
